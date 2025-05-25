@@ -92,7 +92,13 @@ pub extern "C" fn handle_selection(selection: *const c_char) -> bool {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn get_entries() -> EntryList {
+pub extern "C" fn get_entries(query: *const c_char) -> EntryList {
+    let query_str = if query.is_null() {
+        String::new()
+    } else {
+        unsafe { CStr::from_ptr(query).to_string_lossy().to_lowercase() }
+    };
+    
     let mut entries: Vec<Entry> = vec![];
     for item in get_clipboard_history() {
         if item.is_empty() {
@@ -104,6 +110,12 @@ pub extern "C" fn get_entries() -> EntryList {
         }
         let id = split[0];
         let content = split[1];
+        
+        // Filter based on query if one is provided
+        if !query_str.is_empty() && !content.to_lowercase().contains(&query_str) {
+            continue;
+        }
+        
         let id = Box::leak(format!("{}\0", id).into_boxed_str());
         let content = Box::leak(format!("{}\0", content).into_boxed_str());
         entries.push(Entry {
@@ -158,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_get_entries() {
-        let entries = get_entries();
+        let entries = get_entries(std::ptr::null());
         assert!(entries.length > 0);
     }
 }
